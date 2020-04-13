@@ -12,44 +12,7 @@ from skimage.io import imread, imshow
 from sklearn.mixture import GaussianMixture 
 from sklearn.decomposition import PCA
 from skimage.transform import rescale, resize, downscale_local_mean
-
-
-## Performs a K-fold cross validation using LeavePOut SkLearn module
-def KfoldCrossValidation(data,labels,kfold):
-    dataLength = len(data) 
-    batchSize = int(dataLength / kfold)
-    lpo_cross_val_model = KFold(n_splits=kfold)
-    data_np = np.array(data)
-
-    print("batchSize =" , batchSize) 
-    min_loss = 10000
-    validationIndexArray = []
-    lossKfoldArray = []
-    validationIndex = 0
-    
-    for train_index, test_index in lpo_cross_val_model.split(data_np):
-        validationIndexArray.append(validationIndex)
-        validationIndex = validationIndex + 1
-        
-        data_train = data_np[train_index]
-        
-        data_test  = data_np[test_index]
-        labels_train = labels[train_index]
-        labels_test  = labels[test_index]
-        trainedSVM = svmFullTraining(data_train,labels_train)
-        loss_dataset = svmvalidate(trainedSVM,data_test,labels_test,"modelTestExample.png")
-        lossKfoldArray.append(loss_dataset)
-        
-        if(loss_dataset < min_loss):
-            min_loss = loss_dataset
-            svmmodel = trainedSVM
-    
-    plt.plot(validationIndexArray,lossKfoldArray, linewidth=5.0)
-    plt.ylabel(' Loss-K-fold Array ')
-    plt.xlabel(' Validation Index ')
-    plt.savefig('ValidationIndexGraph.png')
-     
-    return svmmodel    
+import matplotlib.colors as colors
  
 lossArray = []
 
@@ -58,7 +21,7 @@ lossArray = []
     
 num_dim = 5
 
-image = imread('3096_color.jpg')
+image = imread('42049_color_res.jpg')
 
 feature_matrix = np.zeros((image.shape[0]*image.shape[1],num_dim))
 print("fm_shape=" , image.shape)
@@ -74,23 +37,48 @@ for i in range(0,image.shape[0]):
 pca = PCA(n_components=2)
 principalComponents = pca.fit_transform(feature_matrix)
 
-print(principalComponents.shape)
-for i in range(int(principalComponents.shape[0]/100)):
+colors_l = ['#F0F8FF','#FAEBD7','#00FFFF','#7FFFD4','#F0FFFF','#F5F5DC','#FFE4C4', '#000000', '#FFEBCD','#0000FF', '#8A2BE2','#A52A2A', '#DEB887','#5F9EA0','#7FFF00','#D2691E','#FF7F50','#6495ED','#FFF8DC','#DC143C']
+
+## PCA decomposition
+for i in range(int(principalComponents.shape[0])):
     plt.scatter(principalComponents[i][0],principalComponents[i][1],c = 'r',s=50)
 plt.show()
 
-Data = np.array(principalComponents[0:int(principalComponents.shape[0]/100),:])
+Data = np.array(principalComponents)
 print(Data.shape)
+
+## GMM decomposition into 2 components
 gmm = GaussianMixture(n_components = 3,covariance_type='spherical',max_iter=1000,n_init=10)
 gmm.fit(Data)
 labels = gmm.predict(Data)
-log_ll = gmm.lower_bound_
-print(" Log_LL = " , log_ll)
 
-for i in range(int(Data.shape[0])):
-    if(labels[i] == 0):
-        plt.scatter(Data[i][0],Data[i][1], c ='r') 
-    else:
-        plt.scatter(Data[i][0],Data[i][1], c ='yellow') 
-
+for i in range(int(principalComponents.shape[0])):
+    plt.scatter(principalComponents[i][0],principalComponents[i][1],c = colors_l[labels[i]],s=50)
 plt.show()
+
+max_log_ll = 1
+n_comp_opt = 1
+
+## KFold validation goes here ::
+for n_comp in range(20):
+    n_comp = n_comp+1
+    gmm = GaussianMixture(n_components = n_comp,covariance_type='spherical',max_iter=1000,n_init=10)
+    gmm.fit(Data)
+    labels = gmm.predict(Data)
+    log_ll = gmm.lower_bound_
+    print(" Log_LL = " , log_ll , " n_comp = " , n_comp)
+    if(log_ll > max_log_ll):
+        max_log_ll = log_ll
+        n_comp_opt = n_comp    
+    
+print(" Log_LL_opt = " , max_log_ll , " n_comp_opt = " , n_comp_opt)     
+gmm = GaussianMixture(n_components = n_comp_opt,covariance_type='spherical',max_iter=1000,n_init=10)
+gmm.fit(Data)
+labels = gmm.predict(Data)
+for i in range(int(principalComponents.shape[0])):
+    plt.scatter(principalComponents[i][0],principalComponents[i][1],c = colors_l[labels[i]],s=50)
+    
+plt.show()
+            
+
+    
